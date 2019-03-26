@@ -21,7 +21,7 @@ namespace maintenance_tracker_api.Functions
         {
 
             vehicle = req;
-            vehicle.Id = Guid.NewGuid();
+            vehicle.id = Guid.NewGuid();
 
             log.LogInformation("Saving new vehicle");
 
