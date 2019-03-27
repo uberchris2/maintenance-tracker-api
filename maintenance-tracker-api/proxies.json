@@ -7,6 +7,20 @@
         "route": "/yearmakemodel/year"
       },
       "backendUri": "https://www.carqueryapi.com/api/0.3/?cmd=getYears"
-    }
+    },
+    "proxyMakes": {
+      "matchCondition": {
+        "methods": [ "GET" ],
+        "route": "/yearmakemodel/make?year={year}"
+      },
+      "backendUri": "https://www.carqueryapi.com/api/0.3/?cmd=getMakes&year={year}"
+    },
+    "proxyModels": {
+      "matchCondition": {
+        "methods": [ "GET" ],
+        "route": "/yearmakemodel/model?year={year}&make={make}"
+      },
+      "backendUri": "https://www.carqueryapi.com/api/0.3/?cmd=getModels&make={make}&year={year}"
+    },
   }
 }
