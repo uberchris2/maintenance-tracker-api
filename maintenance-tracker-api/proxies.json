@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json.schemastore.org/proxies",
+  "proxies": {
+    "proxyYears": {
+      "matchCondition": {
+        "methods": [ "GET" ],
+        "route": "/yearmakemodel/year"
+      },
+      "backendUri": "https://www.carqueryapi.com/api/0.3/?cmd=getYears"
+    }
+  }
+}
