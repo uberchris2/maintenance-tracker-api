@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using maintenance_tracker_api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.WebJobs;
@@ -18,11 +19,13 @@ namespace maintenance_tracker_api.Functions
                 collectionName: "Vehicles",
                 ConnectionStringSetting = "CosmosDBConnection",
                 CreateIfNotExists = true)]out Vehicle vehicle,
-            ILogger log
+            ILogger log,
+            ClaimsPrincipal principal
         )
         {
             vehicle = req;
-            vehicle.id = Guid.NewGuid();
+            vehicle.id = Guid.NewGuid(); //do I need to set this
+            vehicle.UserId = principal.Identity.Name;
             log.LogInformation("Saving new vehicle");
         }
 
@@ -33,7 +36,8 @@ namespace maintenance_tracker_api.Functions
                 databaseName: "MaintenanceDB",
                 collectionName: "Vehicles",
                 ConnectionStringSetting = "CosmosDBConnection")] IEnumerable<Vehicle> vehicles,
-            ILogger log
+            ILogger log,
+            ClaimsPrincipal principal
         )
         {
             log.LogInformation("Got all vehicles");
