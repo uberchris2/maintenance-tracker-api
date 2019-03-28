@@ -41,7 +41,8 @@ namespace maintenance_tracker_api.Functions
         {
             var collectionUri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "Vehicles");
             var vehicles = client.CreateDocumentQuery<Vehicle>(collectionUri)
-                .Where(p => p.UserId == principal.Identity.Name);
+                .Where(p => p.UserId == principal.Identity.Name)
+                .ToList();
             log.LogInformation("Got all vehicles");
             return vehicles;
         }
