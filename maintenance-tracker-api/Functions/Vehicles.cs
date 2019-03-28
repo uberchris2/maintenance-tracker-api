@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using maintenance_tracker_api.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
@@ -32,14 +34,14 @@ namespace maintenance_tracker_api.Functions
         [FunctionName("VehiclesGet")]
         public static IEnumerable<Vehicle> VehiclesGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles")] HttpRequest request,
-            [CosmosDB(
-                databaseName: "MaintenanceDB",
-                collectionName: "Vehicles",
-                ConnectionStringSetting = "CosmosDBConnection")] IEnumerable<Vehicle> vehicles,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")]  DocumentClient client,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
+            var collectionUri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "Vehicles");
+            var vehicles = client.CreateDocumentQuery<Vehicle>(collectionUri)
+                .Where(p => p.UserId == principal.Identity.Name);
             log.LogInformation("Got all vehicles");
             return vehicles;
         }
