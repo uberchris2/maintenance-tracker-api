@@ -26,7 +26,7 @@ namespace maintenance_tracker_api.Functions
         )
         {
             vehicle = req;
-            vehicle.id = Guid.NewGuid(); //do I need to set this
+            //vehicle.id = Guid.NewGuid(); //do I need to set this
             vehicle.UserId = principal.Identity.Name;
             log.LogInformation("Saving new vehicle");
         }
