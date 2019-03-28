@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using maintenance_tracker_api.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -32,9 +32,9 @@ namespace maintenance_tracker_api.Functions
         }
 
         [FunctionName("VehiclesGet")]
-        public static IEnumerable<Vehicle> VehiclesGet(
+        public static IActionResult VehiclesGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles")] HttpRequest request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")]  DocumentClient client,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
             ILogger log,
             ClaimsPrincipal principal
         )
@@ -44,7 +44,28 @@ namespace maintenance_tracker_api.Functions
                 .Where(p => p.UserId == principal.Identity.Name)
                 .ToList();
             log.LogInformation("Got all vehicles");
-            return vehicles;
+            return new OkObjectResult(vehicles);
+        }
+
+        [FunctionName("VehicleGet")]
+        public static IActionResult VehicleGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles/{id}")] HttpRequest request,
+            [CosmosDB(
+                databaseName: "MaintenanceDB",
+                collectionName: "Vehicles",
+                ConnectionStringSetting = "CosmosDBConnection",
+                Id = "{id}")] Vehicle vehicle,
+            ILogger log,
+            ClaimsPrincipal principal
+        )
+        {
+            if (principal.Identity.Name != vehicle.UserId)
+            {
+                return new UnauthorizedResult();
+            }
+
+            log.LogInformation("Got a vehicle");
+            return new OkObjectResult(vehicle);
         }
     }
 }
