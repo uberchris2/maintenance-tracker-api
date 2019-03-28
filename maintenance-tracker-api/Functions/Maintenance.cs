@@ -19,7 +19,8 @@ namespace maintenance_tracker_api.Functions
                 databaseName: "MaintenanceDB",
                 collectionName: "Maintenance",
                 ConnectionStringSetting = "CosmosDBConnection",
-                CreateIfNotExists = true)]out Models.Maintenance maintenance,
+                CreateIfNotExists = true,
+                PartitionKey = "Vehicle")]out Models.Maintenance maintenance,
             ILogger log,
             ClaimsPrincipal principal
         )
@@ -33,7 +34,10 @@ namespace maintenance_tracker_api.Functions
         [FunctionName("MaintenanceGetByVehicle")]
         public static IActionResult MaintenanceGetByVehicle(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "maintenance")] HttpRequest request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
+            [CosmosDB(
+                databaseName: "MaintenanceDB",
+                collectionName: "Maintenance",
+                ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
             ILogger log,
             ClaimsPrincipal principal
         )
