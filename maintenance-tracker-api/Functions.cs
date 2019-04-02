@@ -111,21 +111,5 @@ namespace maintenance_tracker_api
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
             log.LogInformation($"Saving new maintenance id {maintenance.id} for user {principal.Identity.Name}");
         }
-
-        [FunctionName("MaintenanceGetByVehicle")]
-        public static IActionResult MaintenanceGetByVehicle(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "maintenance")] HttpRequest request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
-        {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var maintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri)
-                .Where(p => p.UserId == principal.Identity.Name && p.VehicleId == Guid.Parse(request.Query["vehicleId"]) && p.Type == VehicleMaintenanceTypes.Maintenance);
-            var mappedMaintenance = Mapper.Instance.Map<IEnumerable<MaintenanceDto>>(maintenance);
-            log.LogInformation($"Got all maintenance on vehicle {request.Query["vehicleId"]} for user {principal.Identity.Name}");
-            return new OkObjectResult(mappedMaintenance);
-        }
     }
 }
