@@ -49,8 +49,8 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            var collectionUri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(collectionUri) //TODO async
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
                 .Where(x => x.UserId == principal.Identity.Name && x.Type == VehicleMaintenanceTypes.Vehicle);
             var mappedVehicles = Mapper.Instance.Map<IEnumerable<VehicleDto>>(vehicles);
             log.LogInformation($"Got all vehicles for user {principal.Identity.Name}");
@@ -72,6 +72,25 @@ namespace maintenance_tracker_api
             var documentResponse = await client.ReadDocumentAsync<VehicleMaintenance>(uri, options, token);
             var vehicle = Mapper.Instance.Map<VehicleDto>(documentResponse.Document);
             log.LogInformation($"Got vehicle id {id} for user {principal.Identity.Name}");
+            return new OkObjectResult(vehicle);
+        }
+
+        [FunctionName("VehicleMaintenanceGet")]
+        public static IActionResult VehicleMaintenanceGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicleMaintenance/{id}")] HttpRequest request,
+            string id,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
+            ILogger log,
+            ClaimsPrincipal principal
+        )
+        {
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var parsedId = Guid.Parse(id);
+            var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
+                .Where(x => x.UserId == principal.Identity.Name && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
+            var vehicle = Mapper.Instance.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
+            vehicle.Maintenance = Mapper.Instance.Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance));
+            log.LogInformation($"Got all vehicles for user {principal.Identity.Name}");
             return new OkObjectResult(vehicle);
         }
 
@@ -101,8 +120,8 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            var collectionUri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var maintenance = client.CreateDocumentQuery<VehicleMaintenance>(collectionUri)
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var maintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri)
                 .Where(p => p.UserId == principal.Identity.Name && p.VehicleId == Guid.Parse(request.Query["vehicleId"]) && p.Type == VehicleMaintenanceTypes.Maintenance);
             var mappedMaintenance = Mapper.Instance.Map<IEnumerable<MaintenanceDto>>(maintenance);
             log.LogInformation($"Got all maintenance on vehicle {request.Query["vehicleId"]} for user {principal.Identity.Name}");

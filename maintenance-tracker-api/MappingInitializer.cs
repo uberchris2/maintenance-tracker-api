@@ -1,5 +1,5 @@
 ﻿using AutoMapper;
-using maintenance_tracker_api.MappingProfiles;
+using maintenance_tracker_api.Models;
 
 namespace maintenance_tracker_api
 {
@@ -9,10 +9,11 @@ namespace maintenance_tracker_api
         {
             Mapper.Initialize(config =>
             {
-                config.AddProfile(new VehicleDtoToVehicleMaintenanceProfile());
-                config.AddProfile(new VehicleMaintenanceToVehicleDtoProfile());
-                config.AddProfile(new MaintenanceDtoToVehicleMaintenanceProfile());
-                config.AddProfile(new VehicleMaintenanceToMaintenanceDtoProfile());
+                config.CreateMap<VehicleDto, VehicleMaintenance>();
+                config.CreateMap<MaintenanceDto, VehicleMaintenance>();
+                config.CreateMap<VehicleMaintenance, VehicleDto>();
+                config.CreateMap<VehicleMaintenance, MaintenanceDto>();
+                config.CreateMap<VehicleMaintenance, VehicleMaintenanceDto>();
             });
         }
     }
