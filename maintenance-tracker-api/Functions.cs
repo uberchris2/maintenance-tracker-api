@@ -13,6 +13,7 @@ using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace maintenance_tracker_api
 {
@@ -50,7 +51,8 @@ namespace maintenance_tracker_api
         )
         {
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
+            //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
+            var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri)
                 .Where(x => x.UserId == principal.Identity.Name && x.Type == VehicleMaintenanceTypes.Vehicle);
             var mappedVehicles = Mapper.Instance.Map<IEnumerable<VehicleDto>>(vehicles);
             log.LogInformation($"Got all vehicles for user {principal.Identity.Name}");
@@ -110,6 +112,19 @@ namespace maintenance_tracker_api
             maintenance.UserId = principal.Identity.Name;
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
             log.LogInformation($"Saving new maintenance id {maintenance.id} for user {principal.Identity.Name}");
+        }
+
+
+
+        [FunctionName("Claims")]
+        public static string Claims(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "claims")] HttpRequest req,
+            ClaimsPrincipal principal
+        )
+        {
+            JsonSerializerSettings settings = new JsonSerializerSettings();
+            settings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+            return JsonConvert.SerializeObject(principal.Claims, settings);
         }
     }
 }
