@@ -50,6 +50,7 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
+            log.LogInformation("User is " + principal.FindFirst("oid"));
             var principalClaims = principal.Claims.Select(c => new {c.Type, c.Value, c.ValueType});
             log.LogInformation(JsonConvert.SerializeObject(principalClaims, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
