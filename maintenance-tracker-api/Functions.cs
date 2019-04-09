@@ -13,7 +13,6 @@ using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace maintenance_tracker_api
 {
@@ -28,7 +27,7 @@ namespace maintenance_tracker_api
 
         [FunctionName("VehiclesPost")]
         public static void VehiclesPost(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "vehicles")] VehicleDto req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "vehicles")] VehicleDto request,
             [CosmosDB(
                 databaseName: "MaintenanceDB",
                 collectionName: "VehicleMaintenance",
@@ -37,7 +36,7 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            vehicle = Mapper.Instance.Map<VehicleMaintenance>(req);
+            vehicle = Mapper.Instance.Map<VehicleMaintenance>(request);
             vehicle.id = Guid.NewGuid();
             vehicle.UserId = B2cHelper.GetOid(principal);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
@@ -72,7 +71,7 @@ namespace maintenance_tracker_api
         )
         {
             var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions {PartitionKey = new PartitionKey(B2cHelper.GetOid(principal))};
+            var options = new RequestOptions {PartitionKey = new PartitionKey(B2cHelper.GetOid(principal).ToString())};
             var documentResponse = await client.ReadDocumentAsync<VehicleMaintenance>(uri, options, token);
             var vehicle = Mapper.Instance.Map<VehicleDto>(documentResponse.Document);
             log.LogInformation($"Got vehicle id {id} for user {B2cHelper.GetOid(principal)}");
@@ -100,7 +99,7 @@ namespace maintenance_tracker_api
 
         [FunctionName("MaintenancePost")]
         public static void MaintenancePost(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "maintenance")] MaintenanceDto req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "maintenance")] MaintenanceDto request,
             [CosmosDB(
                 databaseName: "MaintenanceDB",
                 collectionName: "VehicleMaintenance",
@@ -109,7 +108,7 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            maintenance = Mapper.Instance.Map<VehicleMaintenance>(req); ;
+            maintenance = Mapper.Instance.Map<VehicleMaintenance>(request); ;
             maintenance.id = Guid.NewGuid();
             maintenance.UserId = B2cHelper.GetOid(principal);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;

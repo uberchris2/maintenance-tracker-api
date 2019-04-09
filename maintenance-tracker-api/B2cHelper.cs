@@ -9,7 +9,12 @@ namespace maintenance_tracker_api
 
         public static Guid GetOid(ClaimsPrincipal principal)
         {
-            return Guid.Parse(principal.FindFirst(OidClaim).Value);
+            return IsRunningLocally() ? Guid.Empty : Guid.Parse(principal.FindFirst(OidClaim).Value);
+        }
+
+        private static bool IsRunningLocally()
+        {
+            return string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"));
         }
     }
 }
