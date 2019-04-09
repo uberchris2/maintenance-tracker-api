@@ -50,6 +50,7 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
+            log.LogInformation(JsonConvert.SerializeObject(principal.Claims, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
             var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri)
@@ -112,19 +113,6 @@ namespace maintenance_tracker_api
             maintenance.UserId = principal.Identity.Name;
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
             log.LogInformation($"Saving new maintenance id {maintenance.id} for user {principal.Identity.Name}");
-        }
-
-
-
-        [FunctionName("Claims")]
-        public static string Claims(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "claims")] HttpRequest req,
-            ClaimsPrincipal principal
-        )
-        {
-            JsonSerializerSettings settings = new JsonSerializerSettings();
-            settings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-            return JsonConvert.SerializeObject(principal.Claims, settings);
         }
     }
 }
