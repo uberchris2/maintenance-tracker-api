@@ -19,7 +19,7 @@ namespace maintenance_tracker_api
 {
     public static class Functions
     {
-        private static string _oidClaim = "http://schemas.microsoft.com/identity/claims/objectidentifier";
+        
 
         static Functions()
         {
@@ -39,9 +39,9 @@ namespace maintenance_tracker_api
         {
             vehicle = Mapper.Instance.Map<VehicleMaintenance>(req);
             vehicle.id = Guid.NewGuid();
-            vehicle.UserId = principal.Identity.Name;
+            vehicle.UserId = B2cHelper.GetOid(principal);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
-            log.LogInformation($"Saving new vehicle id {vehicle.id} for user {principal.Identity.Name}");
+            log.LogInformation($"Saving new vehicle id {vehicle.id} for user {B2cHelper.GetOid(principal)}");
         }
 
         [FunctionName("VehiclesGet")]
@@ -52,15 +52,12 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            log.LogInformation("User is " + principal.FindFirst(_oidClaim));
-            var principalClaims = principal.Claims.Select(c => new {c.Type, c.Value, c.ValueType});
-            log.LogInformation(JsonConvert.SerializeObject(principalClaims, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
             var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri)
-                .Where(x => x.UserId == principal.Identity.Name && x.Type == VehicleMaintenanceTypes.Vehicle);
+                .Where(x => x.UserId == B2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Vehicle);
             var mappedVehicles = Mapper.Instance.Map<IEnumerable<VehicleDto>>(vehicles);
-            log.LogInformation($"Got all vehicles for user {principal.Identity.Name}");
+            log.LogInformation($"Got all vehicles for user {B2cHelper.GetOid(principal)}");
             return new OkObjectResult(mappedVehicles);
         }
 
@@ -75,10 +72,10 @@ namespace maintenance_tracker_api
         )
         {
             var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions {PartitionKey = new PartitionKey(principal.Identity.Name)};
+            var options = new RequestOptions {PartitionKey = new PartitionKey(B2cHelper.GetOid(principal))};
             var documentResponse = await client.ReadDocumentAsync<VehicleMaintenance>(uri, options, token);
             var vehicle = Mapper.Instance.Map<VehicleDto>(documentResponse.Document);
-            log.LogInformation($"Got vehicle id {id} for user {principal.Identity.Name}");
+            log.LogInformation($"Got vehicle id {id} for user {B2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
 
@@ -94,10 +91,10 @@ namespace maintenance_tracker_api
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             var parsedId = Guid.Parse(id);
             var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
-                .Where(x => x.UserId == principal.Identity.Name && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
+                .Where(x => x.UserId == B2cHelper.GetOid(principal) && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
             var vehicle = Mapper.Instance.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
             vehicle.Maintenance = Mapper.Instance.Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance));
-            log.LogInformation($"Got all vehicles for user {principal.Identity.Name}");
+            log.LogInformation($"Got all vehicles for user {B2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
 
@@ -114,9 +111,9 @@ namespace maintenance_tracker_api
         {
             maintenance = Mapper.Instance.Map<VehicleMaintenance>(req); ;
             maintenance.id = Guid.NewGuid();
-            maintenance.UserId = principal.Identity.Name;
+            maintenance.UserId = B2cHelper.GetOid(principal);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
-            log.LogInformation($"Saving new maintenance id {maintenance.id} for user {principal.Identity.Name}");
+            log.LogInformation($"Saving new maintenance id {maintenance.id} for user {B2cHelper.GetOid(principal)}");
         }
     }
 }

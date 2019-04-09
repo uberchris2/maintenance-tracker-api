@@ -6,7 +6,7 @@ namespace maintenance_tracker_api.Models
     {
         public Guid id { get; set; }
         public string Type { get; set; }
-        public string UserId { get; set; }
+        public Guid UserId { get; set; }
 
         //vehicle fields
         public int Year { get; set; }
