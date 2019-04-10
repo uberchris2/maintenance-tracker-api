@@ -92,7 +92,9 @@ namespace maintenance_tracker_api
             var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
                 .Where(x => x.UserId == B2cHelper.GetOid(principal) && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
             var vehicle = Mapper.Instance.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
-            vehicle.Maintenance = Mapper.Instance.Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance));
+            vehicle.Maintenance = Mapper.Instance
+                .Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance))
+                .OrderByDescending(m => m.Date);
             log.LogInformation($"Got all vehicles for user {B2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
