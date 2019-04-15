@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -13,6 +14,7 @@ using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace maintenance_tracker_api
 {
@@ -131,6 +133,27 @@ namespace maintenance_tracker_api
             var options = new RequestOptions { PartitionKey = new PartitionKey(B2cHelper.GetOid(principal).ToString()) };
             await client.DeleteDocumentAsync(uri, options, token);
             log.LogInformation($"Deleted maintenance id {id} for user {B2cHelper.GetOid(principal)}");
+        }
+
+        [FunctionName("ReceiptAuthorizationGet")]
+        public static IActionResult ReceiptAuthorizationGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "uploadReceipt")] HttpRequest request,
+            [Blob("receipts", FileAccess.ReadWrite)] CloudBlobContainer container,
+            ILogger log,
+            ClaimsPrincipal principal
+        )
+        {
+            var blob = container.GetBlockBlobReference($"{B2cHelper.GetOid(principal)}/{request.Query["name"]}");
+            var policy = new SharedAccessBlobPolicy
+            {
+                SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
+                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(1),
+                Permissions = SharedAccessBlobPermissions.Write
+            };
+            var sas = blob.GetSharedAccessSignature(policy);
+            log.LogInformation($"Authorized upload of receipt \"{request.Query["name"]}\" for user {B2cHelper.GetOid(principal)}");
+            var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
+            return new OkObjectResult(authorization);
         }
     }
 }
