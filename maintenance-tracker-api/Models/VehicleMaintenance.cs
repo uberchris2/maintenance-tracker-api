@@ -20,5 +20,6 @@ namespace maintenance_tracker_api.Models
         public int Mileage { get; set; }
         public DateTime Date { get; set; }
         public string Notes { get; set; }
+        public string Receipt { get; set; }
     }
 }
