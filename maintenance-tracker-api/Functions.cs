@@ -138,7 +138,7 @@ namespace maintenance_tracker_api
 
         [FunctionName("ReceiptAuthorizationGet")]
         public static IActionResult ReceiptAuthorizationGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "uploadReceipt")] HttpRequest request,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
             [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
             ILogger log,
             ClaimsPrincipal principal
@@ -149,10 +149,10 @@ namespace maintenance_tracker_api
             {
                 SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
                 SharedAccessExpiryTime = DateTime.UtcNow.AddHours(1),
-                Permissions = SharedAccessBlobPermissions.Write
+                Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write
             };
             var sas = blob.GetSharedAccessSignature(policy);
-            log.LogInformation($"Authorized upload of receipt \"{request.Query["name"]}\" for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for user {B2cHelper.GetOid(principal)}");
             var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
             return new OkObjectResult(authorization);
         }
