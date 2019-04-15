@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -138,7 +139,7 @@ namespace maintenance_tracker_api
         [FunctionName("ReceiptAuthorizationGet")]
         public static IActionResult ReceiptAuthorizationGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "uploadReceipt")] HttpRequest request,
-            [Blob("receipts", FileAccess.ReadWrite)] CloudBlobContainer container,
+            [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
             ILogger log,
             ClaimsPrincipal principal
         )
