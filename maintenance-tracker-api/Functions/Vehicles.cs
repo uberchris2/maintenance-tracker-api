@@ -80,5 +80,26 @@ namespace maintenance_tracker_api.Functions
             log.LogInformation($"Got vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
+
+        [FunctionName("VehicleDelete")]
+        public async Task VehicleMaintenanceDelete(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "vehicle/{id}")] HttpRequest request,
+            string id,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
+            ILogger log,
+            ClaimsPrincipal principal,
+            CancellationToken token
+        )
+        {
+            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var tasks = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri)
+                .Where(m => (m.VehicleId == Guid.Parse(id) ||  m.id == Guid.Parse(id)) && m.UserId == _b2cHelper.GetOid(principal))
+                .ToList()
+                .Select(m => UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", m.id.ToString()))
+                .Select(u => client.DeleteDocumentAsync(u, options, token));
+            await Task.WhenAll(tasks);
+            log.LogInformation($"Deleted vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
+        }
     }
 }
