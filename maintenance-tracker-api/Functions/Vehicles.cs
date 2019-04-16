@@ -34,12 +34,12 @@ namespace maintenance_tracker_api.Functions
             [CosmosDB(
                 databaseName: "MaintenanceDB",
                 collectionName: "VehicleMaintenance",
-                ConnectionStringSetting = "CosmosDBConnection")]out VehicleMaintenanceModel vehicle,
+                ConnectionStringSetting = "CosmosDBConnection")]out VehicleModel vehicle,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
-            vehicle = _mapper.Map<VehicleMaintenanceModel>(request);
+            vehicle = _mapper.Map<VehicleModel>(request);
             vehicle.id = Guid.NewGuid();
             vehicle.UserId = _b2cHelper.GetOid(principal);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
@@ -56,7 +56,7 @@ namespace maintenance_tracker_api.Functions
         {
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
-            var vehicles = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri)
+            var vehicles = client.CreateDocumentQuery<VehicleModel>(uri)
                 .Where(x => x.UserId == _b2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Vehicle);
             var mappedVehicles = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
             log.LogInformation($"Got all vehicles for user {_b2cHelper.GetOid(principal)}");
@@ -75,7 +75,7 @@ namespace maintenance_tracker_api.Functions
         {
             var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
             var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            var documentResponse = await client.ReadDocumentAsync<VehicleMaintenanceModel>(uri, options, token);
+            var documentResponse = await client.ReadDocumentAsync<VehicleModel>(uri, options, token);
             var vehicle = _mapper.Map<VehicleDto>(documentResponse.Document);
             log.LogInformation($"Got vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);

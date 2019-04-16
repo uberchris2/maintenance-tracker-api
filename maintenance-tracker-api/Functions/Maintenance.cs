@@ -26,12 +26,12 @@ namespace maintenance_tracker_api.Functions
             [CosmosDB(
                 databaseName: "MaintenanceDB",
                 collectionName: "VehicleMaintenance",
-                ConnectionStringSetting = "CosmosDBConnection")]out VehicleMaintenanceModel maintenance,
+                ConnectionStringSetting = "CosmosDBConnection")]out MaintenanceModel maintenance,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
-            maintenance = _mapper.Map<VehicleMaintenanceModel>(request); ;
+            maintenance = _mapper.Map<MaintenanceModel>(request); ;
             maintenance.id = Guid.NewGuid();
             maintenance.UserId = _b2cHelper.GetOid(principal);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
