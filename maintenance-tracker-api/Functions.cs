@@ -16,6 +16,7 @@ using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Newtonsoft.Json;
 
 namespace maintenance_tracker_api
 {
@@ -54,6 +55,9 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
+            var principalClaims = principal.Claims.Select(c => new { c.Type, c.Value, c.ValueType });
+            log.LogInformation(JsonConvert.SerializeObject(principalClaims, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
+
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
             var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri)
