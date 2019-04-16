@@ -2,7 +2,7 @@ using System;
 
 namespace maintenance_tracker_api.Models
 {
-    public class VehicleMaintenance
+    public class VehicleMaintenanceModel
     {
         public Guid id { get; set; }
         public string Type { get; set; }

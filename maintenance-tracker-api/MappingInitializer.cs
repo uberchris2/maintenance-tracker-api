@@ -9,11 +9,11 @@ namespace maintenance_tracker_api
         {
             Mapper.Initialize(config =>
             {
-                config.CreateMap<VehicleDto, VehicleMaintenance>();
-                config.CreateMap<MaintenanceDto, VehicleMaintenance>();
-                config.CreateMap<VehicleMaintenance, VehicleDto>();
-                config.CreateMap<VehicleMaintenance, MaintenanceDto>();
-                config.CreateMap<VehicleMaintenance, VehicleMaintenanceDto>();
+                config.CreateMap<VehicleDto, VehicleMaintenanceModel>();
+                config.CreateMap<MaintenanceDto, VehicleMaintenanceModel>();
+                config.CreateMap<VehicleMaintenanceModel, VehicleDto>();
+                config.CreateMap<VehicleMaintenanceModel, MaintenanceDto>();
+                config.CreateMap<VehicleMaintenanceModel, VehicleMaintenanceDto>();
             });
         }
     }

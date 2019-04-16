@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Security.Claims;
 
-namespace maintenance_tracker_api
+namespace maintenance_tracker_api.Services
 {
     public interface IB2cHelper
     {
