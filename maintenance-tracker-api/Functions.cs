@@ -12,11 +12,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using SendGrid.Helpers.Mail;
 
 namespace maintenance_tracker_api
 {
@@ -159,6 +159,22 @@ namespace maintenance_tracker_api
             log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for user {B2cHelper.GetOid(principal)}");
             var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
             return new OkObjectResult(authorization);
+        }
+
+        [FunctionName("FeedbackPost")]
+        public static void FeedbackPost(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "feedback")] FeedbackDto request,
+            [SendGrid] out SendGridMessage message,
+            ILogger log,
+            ClaimsPrincipal principal
+        )
+        {
+            message = new SendGridMessage();
+            message.AddTo(Environment.GetEnvironmentVariable("FeedbackRecipient"));
+            message.AddContent("text/html", $"{B2cHelper.GetName(principal)} says:<br /><br />{request.Message}");
+            message.SetFrom(B2cHelper.GetEmail(principal));
+            message.SetSubject("Feedback from MaintenanceTracker");
+            log.LogInformation($"Sending feedback message from user {B2cHelper.GetOid(principal)}");
         }
     }
 }
