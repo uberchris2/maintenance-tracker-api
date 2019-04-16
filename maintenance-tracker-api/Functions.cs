@@ -20,17 +20,19 @@ using SendGrid.Helpers.Mail;
 
 namespace maintenance_tracker_api
 {
-    public static class Functions
+    public class Functions
     {
-        
+        private readonly IB2cHelper _b2cHelper;
+        private readonly IMapper _mapper;
 
-        static Functions()
+        public Functions(IB2cHelper b2cHelper)
         {
-            MappingInitializer.Activate();
+            _b2cHelper = b2cHelper;
+            _mapper = Mapper.Instance; //todo DI this
         }
 
         [FunctionName("VehiclesPost")]
-        public static void VehiclesPost(
+        public void VehiclesPost(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "vehicles")] VehicleDto request,
             [CosmosDB(
                 databaseName: "MaintenanceDB",
@@ -40,35 +42,32 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            vehicle = Mapper.Instance.Map<VehicleMaintenance>(request);
+            vehicle = _mapper.Map<VehicleMaintenance>(request);
             vehicle.id = Guid.NewGuid();
-            vehicle.UserId = B2cHelper.GetOid(principal);
+            vehicle.UserId = _b2cHelper.GetOid(principal);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
-            log.LogInformation($"Saving new vehicle id {vehicle.id} for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Saving new vehicle id {vehicle.id} for user {_b2cHelper.GetOid(principal)}");
         }
 
         [FunctionName("VehiclesGet")]
-        public static IActionResult VehiclesGet(
+        public IActionResult VehiclesGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles")] HttpRequest request,
             [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
-            var principalClaims = principal.Claims.Select(c => new { c.Type, c.Value, c.ValueType });
-            log.LogInformation(JsonConvert.SerializeObject(principalClaims, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
-
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
             var vehicles = client.CreateDocumentQuery<VehicleMaintenance>(uri)
-                .Where(x => x.UserId == B2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Vehicle);
-            var mappedVehicles = Mapper.Instance.Map<IEnumerable<VehicleDto>>(vehicles);
-            log.LogInformation($"Got all vehicles for user {B2cHelper.GetOid(principal)}");
+                .Where(x => x.UserId == _b2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Vehicle);
+            var mappedVehicles = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
+            log.LogInformation($"Got all vehicles for user {_b2cHelper.GetOid(principal)}");
             return new OkObjectResult(mappedVehicles);
         }
 
         [FunctionName("VehicleGet")]
-        public static async Task<IActionResult> VehicleGet(
+        public async Task<IActionResult> VehicleGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles/{id}")] HttpRequest request,
             string id,
             [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
@@ -78,15 +77,15 @@ namespace maintenance_tracker_api
         )
         {
             var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions {PartitionKey = new PartitionKey(B2cHelper.GetOid(principal).ToString())};
+            var options = new RequestOptions {PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString())};
             var documentResponse = await client.ReadDocumentAsync<VehicleMaintenance>(uri, options, token);
-            var vehicle = Mapper.Instance.Map<VehicleDto>(documentResponse.Document);
-            log.LogInformation($"Got vehicle id {id} for user {B2cHelper.GetOid(principal)}");
+            var vehicle = _mapper.Map<VehicleDto>(documentResponse.Document);
+            log.LogInformation($"Got vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
 
         [FunctionName("VehicleMaintenanceGet")]
-        public static IActionResult VehicleMaintenanceGet(
+        public IActionResult VehicleMaintenanceGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicleMaintenance/{id}")] HttpRequest request,
             string id,
             [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
@@ -97,17 +96,17 @@ namespace maintenance_tracker_api
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             var parsedId = Guid.Parse(id);
             var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenance>(uri) //TODO async
-                .Where(x => x.UserId == B2cHelper.GetOid(principal) && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
-            var vehicle = Mapper.Instance.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
-            vehicle.Maintenance = Mapper.Instance
+                .Where(x => x.UserId == _b2cHelper.GetOid(principal) && (x.id == parsedId || x.VehicleId == parsedId)).ToList();
+            var vehicle = _mapper.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
+            vehicle.Maintenance = _mapper
                 .Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance))
                 .OrderByDescending(m => m.Date);
-            log.LogInformation($"Got all vehicles for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Got all vehicles for user {_b2cHelper.GetOid(principal)}");
             return new OkObjectResult(vehicle);
         }
 
         [FunctionName("MaintenancePost")]
-        public static void MaintenancePost(
+        public void MaintenancePost(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "maintenance")] MaintenanceDto request,
             [CosmosDB(
                 databaseName: "MaintenanceDB",
@@ -117,15 +116,15 @@ namespace maintenance_tracker_api
             ClaimsPrincipal principal
         )
         {
-            maintenance = Mapper.Instance.Map<VehicleMaintenance>(request); ;
+            maintenance = _mapper.Map<VehicleMaintenance>(request); ;
             maintenance.id = Guid.NewGuid();
-            maintenance.UserId = B2cHelper.GetOid(principal);
+            maintenance.UserId = _b2cHelper.GetOid(principal);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
-            log.LogInformation($"Saving new maintenance id {maintenance.id} for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Saving new maintenance id {maintenance.id} for user {_b2cHelper.GetOid(principal)}");
         }
 
         [FunctionName("VehicleMaintenanceDelete")]
-        public static async Task VehicleMaintenanceDelete(
+        public async Task VehicleMaintenanceDelete(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "vehicleMaintenance/{id}")] HttpRequest request,
             string id,
             [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
@@ -135,20 +134,20 @@ namespace maintenance_tracker_api
         )
         {
             var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions { PartitionKey = new PartitionKey(B2cHelper.GetOid(principal).ToString()) };
+            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
             await client.DeleteDocumentAsync(uri, options, token);
-            log.LogInformation($"Deleted maintenance id {id} for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Deleted maintenance id {id} for user {_b2cHelper.GetOid(principal)}");
         }
 
         [FunctionName("ReceiptAuthorizationGet")]
-        public static IActionResult ReceiptAuthorizationGet(
+        public IActionResult ReceiptAuthorizationGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
             [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
-            var blob = container.GetBlockBlobReference($"{B2cHelper.GetOid(principal)}/{request.Query["name"]}");
+            var blob = container.GetBlockBlobReference($"{_b2cHelper.GetOid(principal)}/{request.Query["name"]}");
             var policy = new SharedAccessBlobPolicy
             {
                 SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
@@ -156,13 +155,13 @@ namespace maintenance_tracker_api
                 Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write
             };
             var sas = blob.GetSharedAccessSignature(policy);
-            log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for user {_b2cHelper.GetOid(principal)}");
             var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
             return new OkObjectResult(authorization);
         }
 
         [FunctionName("FeedbackPost")]
-        public static void FeedbackPost(
+        public void FeedbackPost(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "feedback")] FeedbackDto request,
             [SendGrid] out SendGridMessage message,
             ILogger log,
@@ -171,10 +170,10 @@ namespace maintenance_tracker_api
         {
             message = new SendGridMessage();
             message.AddTo(Environment.GetEnvironmentVariable("FeedbackRecipient"));
-            message.AddContent("text/html", $"{B2cHelper.GetName(principal)} says:<br /><br />{request.Message}");
-            message.SetFrom(B2cHelper.GetEmail(principal));
+            message.AddContent("text/html", $"{_b2cHelper.GetName(principal)} says:<br /><br />{request.Message}");
+            message.SetFrom(_b2cHelper.GetEmail(principal));
             message.SetSubject("Feedback from MaintenanceTracker");
-            log.LogInformation($"Sending feedback message from user {B2cHelper.GetOid(principal)}");
+            log.LogInformation($"Sending feedback message from user {_b2cHelper.GetOid(principal)}");
         }
     }
 }
