@@ -12,6 +12,7 @@ namespace maintenance_tracker_api.Models
         public string Make { get; set; }
         public string Model { get; set; }
         public string Name { get; set; }
+        public int Mileage { get; set; }
         public IEnumerable<MaintenanceDto> Maintenance { get; set; }
     }
 }
