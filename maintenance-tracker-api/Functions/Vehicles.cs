@@ -28,9 +28,9 @@ namespace maintenance_tracker_api.Functions
             _mapper = mapper;
         }
 
-        [FunctionName("VehiclesPost")]
-        public void VehiclesPost(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "vehicles")] VehicleDto request,
+        [FunctionName("VehiclesPut")]
+        public void VehiclesPut(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "vehicles")] VehicleDto request,
             [CosmosDB(
                 databaseName: "MaintenanceDB",
                 collectionName: "VehicleMaintenance",
@@ -40,7 +40,10 @@ namespace maintenance_tracker_api.Functions
         )
         {
             vehicle = _mapper.Map<VehicleModel>(request);
-            vehicle.id = Guid.NewGuid();
+            if (vehicle.id == Guid.Empty)
+            {
+                vehicle.id = Guid.NewGuid();
+            }
             vehicle.UserId = _b2cHelper.GetOid(principal);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
             log.LogInformation($"Saving new vehicle id {vehicle.id} for user {_b2cHelper.GetOid(principal)}");
