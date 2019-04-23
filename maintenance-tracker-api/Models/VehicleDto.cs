@@ -1,5 +1,3 @@
-using System;
-
 namespace maintenance_tracker_api.Models
 {
     public class VehicleDto
