@@ -14,6 +14,7 @@ namespace maintenance_tracker_api.Models
         public Guid VehicleId { get; set; }
         public string Item { get; set; }
         public int Mileage { get; set; }
+        public bool Shared { get; set; }
         public DateTime Date { get; set; }
         public string Notes { get; set; }
         public string Receipt { get; set; }

@@ -12,5 +12,6 @@ namespace maintenance_tracker_api.Models
         public string Model { get; set; }
         public string Name { get; set; }
         public int Mileage { get; set; }
+        public bool Shared { get; set; }
     }
 }
