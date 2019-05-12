@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using common.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +17,7 @@ namespace maintenance_tracker_api_public.Functions
     {
         //I would love to use a SqlQuery in this endpoint, but https://github.com/Azure/azure-webjobs-sdk/issues/1726
         [FunctionName("ReceiptAuthorizationGet")]
-        public async Task<IActionResult> ReceiptAuthorizationGet(
+        public IActionResult ReceiptAuthorizationGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
             [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
             [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
