@@ -3,7 +3,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
-using maintenance_tracker_api.Models;
+using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Documents;

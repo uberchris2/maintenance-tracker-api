@@ -1,7 +1,7 @@
 ﻿using AutoMapper;
-using maintenance_tracker_api.Models;
+using common.Models;
 
-namespace maintenance_tracker_api
+namespace common
 {
     public static class MappingInitializer
     {

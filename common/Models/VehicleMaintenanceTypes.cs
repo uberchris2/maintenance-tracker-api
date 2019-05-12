@@ -1,4 +1,4 @@
-namespace maintenance_tracker_api.Models
+namespace common.Models
 {
     public class VehicleMaintenanceTypes
     {

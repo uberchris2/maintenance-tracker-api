@@ -1,12 +1,10 @@
-using System;
-
-namespace maintenance_tracker_api.Models
+namespace common.Models
 {
-    public class VehicleModel : IVehicleMaintenanceModel
+    public class VehicleDto
     {
-        public Guid id { get; set; }
-        public string Type { get; set; }
-        public Guid UserId { get; set; }
+        // ReSharper disable once InconsistentNaming
+        public string id { get; set; }
+        public string UserId { get; set; }
         public int Year { get; set; }
         public string Make { get; set; }
         public string Model { get; set; }

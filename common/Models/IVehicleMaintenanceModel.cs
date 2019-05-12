@@ -1,6 +1,6 @@
 using System;
 
-namespace maintenance_tracker_api.Models
+namespace common.Models
 {
     public interface IVehicleMaintenanceModel
     {

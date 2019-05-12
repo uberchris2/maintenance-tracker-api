@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.539
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "maintenance-tracker-api", "maintenance-tracker-api\maintenance-tracker-api.csproj", "{D5A4714F-6265-4067-945A-65B623B5ADDC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "maintenance-tracker-api", "maintenance-tracker-api\maintenance-tracker-api.csproj", "{D5A4714F-6265-4067-945A-65B623B5ADDC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "maintenance-tracker-api-public", "maintenance-tracker-api-public\maintenance-tracker-api-public.csproj", "{B695EF03-F75D-4659-AA16-7E11703B500B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "common", "common\common.csproj", "{36924F6C-F4FE-4746-96EB-8F01C7121144}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{D5A4714F-6265-4067-945A-65B623B5ADDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5A4714F-6265-4067-945A-65B623B5ADDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5A4714F-6265-4067-945A-65B623B5ADDC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B695EF03-F75D-4659-AA16-7E11703B500B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B695EF03-F75D-4659-AA16-7E11703B500B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B695EF03-F75D-4659-AA16-7E11703B500B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B695EF03-F75D-4659-AA16-7E11703B500B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36924F6C-F4FE-4746-96EB-8F01C7121144}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36924F6C-F4FE-4746-96EB-8F01C7121144}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36924F6C-F4FE-4746-96EB-8F01C7121144}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36924F6C-F4FE-4746-96EB-8F01C7121144}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

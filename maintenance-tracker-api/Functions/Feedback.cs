@@ -1,7 +1,6 @@
 using System;
 using System.Security.Claims;
-using AutoMapper;
-using maintenance_tracker_api.Models;
+using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -13,12 +12,10 @@ namespace maintenance_tracker_api.Functions
     public class Feedback
     {
         private readonly IB2cHelper _b2cHelper;
-        private readonly IMapper _mapper;
 
-        public Feedback(IB2cHelper b2cHelper, IMapper mapper)
+        public Feedback(IB2cHelper b2cHelper)
         {
             _b2cHelper = b2cHelper;
-            _mapper = mapper;
         }
 
         [FunctionName("FeedbackPost")]

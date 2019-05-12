@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Claims;
-using maintenance_tracker_api.Models;
+using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
