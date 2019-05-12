@@ -1,15 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using common.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -20,25 +16,22 @@ namespace maintenance_tracker_api_public.Functions
 {
     public class Receipts
     {
-        private readonly IMapper _mapper;
-
-        public Receipts(IMapper mapper)
-        {
-            _mapper = mapper;
-        }
-
+        //I would love to use a SqlQuery in this endpoint, but https://github.com/Azure/azure-webjobs-sdk/issues/1726
         [FunctionName("ReceiptAuthorizationGet")]
         public async Task<IActionResult> ReceiptAuthorizationGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
             [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
-            [CosmosDB("MaintenanceDB", "VehicleMaintenance", ConnectionStringSetting = "CosmosDBConnection", 
-                SqlQuery = "select * from VehicleMaintenance vm where UserId = '{Query.userId}' AND ((vm.id = '{Query.vehicleId}' AND vm.Shared = true) OR vm.VehicleId = 'Query.vehicleId')")] IList<VehicleMaintenanceModel> vehiclesAndMaintenance,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
             ILogger log,
             CancellationToken token
         )
         {
-            if (vehiclesAndMaintenance.Count(vm => vm.Type == VehicleMaintenanceTypes.Vehicle) != 1
-                || !vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle).Shared
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var vehicleId = Guid.Parse(request.Query["vehicleId"]);
+            var userId = Guid.Parse(request.Query["userId"]);
+            var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri)
+                .Where(x => x.UserId == userId && (x.id == vehicleId || x.VehicleId == vehicleId)).ToList();
+            if (!vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle).Shared
                 || !vehiclesAndMaintenance.Any(vm => vm.Type == VehicleMaintenanceTypes.Maintenance && vm.Receipt == request.Query["name"]))
             {
                 return new BadRequestResult();

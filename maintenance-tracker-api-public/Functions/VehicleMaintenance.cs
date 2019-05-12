@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using AutoMapper;
 using common.Models;
 using Microsoft.AspNetCore.Http;
@@ -34,7 +33,7 @@ namespace maintenance_tracker_api_public.Functions
             var parsedId = Guid.Parse(id);
             var options = new FeedOptions {EnableCrossPartitionQuery = true};
             var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri, options) //TODO async
-                .Where(x => (x.id == parsedId || x.VehicleId == parsedId)).ToList();
+                .Where(x => x.id == parsedId || x.VehicleId == parsedId).ToList();
             var vehicle = _mapper.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
             if (!vehicle.Shared)
             {
