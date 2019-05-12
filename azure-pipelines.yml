@@ -15,8 +15,9 @@ steps:
   displayName: 'Publish private API'
   workingDirectory: maintenance-tracker-api
 - task: PublishBuildArtifacts@1
-  pathtoPublish: '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api'
-  artifactName: 'maintenance-tracker-api'
+  inputs:
+    pathtoPublish: '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api'
+    artifactName: 'maintenance-tracker-api'
 - script: dotnet build --configuration $(buildConfiguration)
   displayName: 'Build public API'
   workingDirectory: maintenance-tracker-api-public
@@ -24,5 +25,6 @@ steps:
   displayName: 'Publish public API'
   workingDirectory: maintenance-tracker-api-public
 - task: PublishBuildArtifacts@1
-  pathtoPublish: '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api-public'
-  artifactName: 'maintenance-tracker-api-public'
+  inputs:
+    pathtoPublish: '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api-public'
+    artifactName: 'maintenance-tracker-api-public'
