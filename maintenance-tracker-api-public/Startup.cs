@@ -1,12 +1,12 @@
 ﻿using AutoMapper;
 using common;
-using maintenance_tracker_api;
+using maintenance_tracker_api_public;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 [assembly: WebJobsStartup(typeof(Startup))]
-namespace maintenance_tracker_api
+namespace maintenance_tracker_api_public
 {
     class Startup : IWebJobsStartup
     {
