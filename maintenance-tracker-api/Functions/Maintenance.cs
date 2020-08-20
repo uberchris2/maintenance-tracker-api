@@ -6,6 +6,7 @@ using AutoMapper;
 using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.WebJobs;
@@ -25,22 +26,25 @@ namespace maintenance_tracker_api.Functions
             _mapper = mapper;
         }
 
-        [FunctionName("MaintenancePost")]
-        public void MaintenancePost(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "maintenance")] MaintenanceDto request,
-            [CosmosDB(
-                databaseName: "MaintenanceDB",
-                collectionName: "VehicleMaintenance",
-                ConnectionStringSetting = "CosmosDBConnection")]out MaintenanceModel maintenance,
+        [FunctionName("MaintenanceUpsert")]
+        public async Task MaintenanceUpsert(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "maintenance")] MaintenanceDto request,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
             ILogger log,
             ClaimsPrincipal principal
         )
         {
-            maintenance = _mapper.Map<MaintenanceModel>(request); ;
-            maintenance.id = Guid.NewGuid();
+            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
+            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
+            var maintenance = _mapper.Map<MaintenanceModel>(request);
+            if (maintenance.id == null)
+            {
+                maintenance.id = Guid.NewGuid();
+            }
             maintenance.UserId = _b2cHelper.GetOid(principal);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
-            log.LogInformation($"Saving new maintenance id {maintenance.id} for user {_b2cHelper.GetOid(principal)}");
+            await client.UpsertDocumentAsync(uri, maintenance, options);
+            log.LogInformation($"Upserting maintenance id {maintenance.id} for user {_b2cHelper.GetOid(principal)}");
         }
 
         [FunctionName("MaintenanceDelete")]
@@ -57,6 +61,24 @@ namespace maintenance_tracker_api.Functions
             var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
             await client.DeleteDocumentAsync(uri, options, token);
             log.LogInformation($"Deleted maintenance id {id} for user {_b2cHelper.GetOid(principal)}");
+        }
+
+        [FunctionName("MaintenanceGet")]
+        public async Task<IActionResult> MaintenanceGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "maintenance/{id}")] MaintenanceDto request,
+            string id,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
+            ILogger log,
+            ClaimsPrincipal principal,
+            CancellationToken token
+        )
+        {
+            var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
+            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
+            var documentResponse = await client.ReadDocumentAsync<MaintenanceModel>(uri, options, token);
+            var maintenance = _mapper.Map<MaintenanceDto>(documentResponse.Document);
+            log.LogInformation($"Got maintenance id {id} for user {_b2cHelper.GetOid(principal)}");
+            return new OkObjectResult(maintenance);
         }
     }
 }
