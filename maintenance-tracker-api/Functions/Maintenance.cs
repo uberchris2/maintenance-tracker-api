@@ -37,7 +37,7 @@ namespace maintenance_tracker_api.Functions
             var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
             var maintenance = _mapper.Map<MaintenanceModel>(request);
-            if (maintenance.id == null)
+            if (maintenance.id == Guid.Empty)
             {
                 maintenance.id = Guid.NewGuid();
             }
