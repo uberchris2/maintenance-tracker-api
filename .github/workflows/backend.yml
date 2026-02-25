@@ -1,0 +1,95 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      # Private API
+      - name: Restore private API
+        run: dotnet restore
+        working-directory: maintenance-tracker-api/maintenance-tracker-api
+
+      - name: Build private API
+        run: dotnet build --configuration Release --no-restore
+        working-directory: maintenance-tracker-api/maintenance-tracker-api
+
+      - name: Publish private API
+        run: dotnet publish --configuration Release --no-build --output '${{ github.workspace }}/artifacts/maintenance-tracker-api'
+        working-directory: maintenance-tracker-api/maintenance-tracker-api
+
+      - name: Upload private API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-tracker-api
+          path: ${{ github.workspace }}/artifacts/maintenance-tracker-api
+
+      # Public API
+      - name: Restore public API
+        run: dotnet restore
+        working-directory: maintenance-tracker-api/maintenance-tracker-api-public
+
+      - name: Build public API
+        run: dotnet build --configuration Release --no-restore
+        working-directory: maintenance-tracker-api/maintenance-tracker-api-public
+
+      - name: Publish public API
+        run: dotnet publish --configuration Release --no-build --output '${{ github.workspace }}/artifacts/maintenance-tracker-api-public'
+        working-directory: maintenance-tracker-api/maintenance-tracker-api-public
+
+      - name: Upload public API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-tracker-api-public
+          path: ${{ github.workspace }}/artifacts/maintenance-tracker-api-public
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download private API artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maintenance-tracker-api
+          path: ${{ github.workspace }}/artifacts/maintenance-tracker-api
+
+      - name: Download public API artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maintenance-tracker-api-public
+          path: ${{ github.workspace }}/artifacts/maintenance-tracker-api-public
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy private API to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: 'maintenance-tracker-api'
+          package: ${{ github.workspace }}/artifacts/maintenance-tracker-api
+
+      - name: Deploy public API to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: 'maintenance-tracker-api-public'
+          package: ${{ github.workspace }}/artifacts/maintenance-tracker-api-public
