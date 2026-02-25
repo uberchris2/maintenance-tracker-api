@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AutoMapper;
 using common.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
 namespace maintenance_tracker_api_public.Functions
@@ -15,34 +16,41 @@ namespace maintenance_tracker_api_public.Functions
     public class VehicleMaintenance
     {
         private readonly IMapper _mapper;
+        private readonly CosmosClient _cosmosClient;
+        private readonly ILogger<VehicleMaintenance> _logger;
 
-        public VehicleMaintenance(IMapper mapper)
+        public VehicleMaintenance(IMapper mapper, CosmosClient cosmosClient, ILogger<VehicleMaintenance> logger)
         {
             _mapper = mapper;
+            _cosmosClient = cosmosClient;
+            _logger = logger;
         }
 
-        [FunctionName("VehicleMaintenanceGet")]
-        public IActionResult VehicleMaintenanceGet(
+        [Function("VehicleMaintenanceGet")]
+        public async Task<IActionResult> VehicleMaintenanceGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicleMaintenance/{id}")] HttpRequest request,
-            string id,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log
-        )
+            string id)
         {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
             var parsedId = Guid.Parse(id);
-            var options = new FeedOptions {EnableCrossPartitionQuery = true};
-            var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri, options) //TODO async
-                .Where(x => x.id == parsedId || x.VehicleId == parsedId).ToList();
+
+            // Cross-partition query — no PartitionKey set, which is the v3 equivalent of EnableCrossPartitionQuery = true
+            var query = _cosmosClient.GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance")
+                .GetItemLinqQueryable<VehicleMaintenanceModel>()
+                .Where(x => x.id == parsedId || x.VehicleId == parsedId)
+                .ToFeedIterator();
+
+            var vehiclesAndMaintenance = new List<VehicleMaintenanceModel>();
+            while (query.HasMoreResults)
+                vehiclesAndMaintenance.AddRange(await query.ReadNextAsync(request.HttpContext.RequestAborted));
+
             var vehicle = _mapper.Map<VehicleMaintenanceDto>(vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle));
             if (!vehicle.Shared)
-            {
                 return new BadRequestResult();
-            }
+
             vehicle.Maintenance = _mapper
                 .Map<IEnumerable<MaintenanceDto>>(vehiclesAndMaintenance.Where(vm => vm.Type == VehicleMaintenanceTypes.Maintenance))
                 .OrderByDescending(m => m.Date);
-            log.LogInformation($"Got all vehicles for anonymous user at {request.HttpContext.Connection.RemoteIpAddress}");
+            _logger.LogInformation($"Got vehicle maintenance for anonymous user at {request.HttpContext.Connection.RemoteIpAddress}");
             return new OkObjectResult(vehicle);
         }
     }

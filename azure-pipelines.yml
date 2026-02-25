@@ -2,26 +2,39 @@ trigger:
 - master
 
 pool:
-  vmImage: 'Ubuntu-16.04'
+  vmImage: 'ubuntu-latest'
 
 variables:
   buildConfiguration: 'Release'
 
 steps:
-- script: dotnet build --configuration $(buildConfiguration)
+- task: UseDotNet@2
+  displayName: 'Use .NET 8 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+- script: dotnet restore
+  displayName: 'Restore private API'
+  workingDirectory: maintenance-tracker-api
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build private API'
   workingDirectory: maintenance-tracker-api
-- script: dotnet publish --output '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api'
+- script: dotnet publish --configuration $(buildConfiguration) --no-build --output '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api'
   displayName: 'Publish private API'
   workingDirectory: maintenance-tracker-api
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api'
     artifactName: 'maintenance-tracker-api'
-- script: dotnet build --configuration $(buildConfiguration)
+
+- script: dotnet restore
+  displayName: 'Restore public API'
+  workingDirectory: maintenance-tracker-api-public
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'Build public API'
   workingDirectory: maintenance-tracker-api-public
-- script: dotnet publish --output '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api-public'
+- script: dotnet publish --configuration $(buildConfiguration) --no-build --output '$(Build.ArtifactStagingDirectory)/maintenance-tracker-api-public'
   displayName: 'Publish public API'
   workingDirectory: maintenance-tracker-api-public
 - task: PublishBuildArtifacts@1

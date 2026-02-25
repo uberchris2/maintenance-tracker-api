@@ -1,16 +1,14 @@
 using System;
-using System.Security.Claims;
-using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
 using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
 namespace maintenance_tracker_api.Functions
@@ -19,65 +17,58 @@ namespace maintenance_tracker_api.Functions
     {
         private readonly IB2cHelper _b2cHelper;
         private readonly IMapper _mapper;
+        private readonly CosmosClient _cosmosClient;
+        private readonly ILogger<Maintenance> _logger;
 
-        public Maintenance(IB2cHelper b2cHelper, IMapper mapper)
+        public Maintenance(IB2cHelper b2cHelper, IMapper mapper, CosmosClient cosmosClient, ILogger<Maintenance> logger)
         {
             _b2cHelper = b2cHelper;
             _mapper = mapper;
+            _cosmosClient = cosmosClient;
+            _logger = logger;
         }
 
-        [FunctionName("MaintenanceUpsert")]
-        public async Task MaintenanceUpsert(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "maintenance")] MaintenanceDto request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+        private Container GetContainer() =>
+            _cosmosClient.GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance");
+
+        [Function("MaintenanceUpsert")]
+        public async Task<IActionResult> MaintenanceUpsert(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "maintenance")] HttpRequest request)
         {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            var maintenance = _mapper.Map<MaintenanceModel>(request);
+            var dto = await request.ReadFromJsonAsync<MaintenanceDto>();
+            var maintenance = _mapper.Map<MaintenanceModel>(dto);
             if (maintenance.id == Guid.Empty)
-            {
                 maintenance.id = Guid.NewGuid();
-            }
-            maintenance.UserId = _b2cHelper.GetOid(principal);
+            maintenance.UserId = _b2cHelper.GetOid(request);
             maintenance.Type = VehicleMaintenanceTypes.Maintenance;
-            await client.UpsertDocumentAsync(uri, maintenance, options);
-            log.LogInformation($"Upserting maintenance id {maintenance.id} for user {_b2cHelper.GetOid(principal)}");
+            await GetContainer().UpsertItemAsync(maintenance, new PartitionKey(maintenance.UserId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            _logger.LogInformation($"Upserting maintenance id {maintenance.id} for user {maintenance.UserId}");
+            return new OkResult();
         }
 
-        [FunctionName("MaintenanceDelete")]
-        public async Task MaintenanceDelete(
+        [Function("MaintenanceDelete")]
+        public async Task<IActionResult> MaintenanceDelete(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "maintenance/{id}")] HttpRequest request,
-            string id,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal,
-            CancellationToken token
-        )
+            string id)
         {
-            var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            await client.DeleteDocumentAsync(uri, options, token);
-            log.LogInformation($"Deleted maintenance id {id} for user {_b2cHelper.GetOid(principal)}");
+            var userId = _b2cHelper.GetOid(request);
+            await GetContainer().DeleteItemAsync<MaintenanceModel>(id, new PartitionKey(userId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            _logger.LogInformation($"Deleted maintenance id {id} for user {userId}");
+            return new OkResult();
         }
 
-        [FunctionName("MaintenanceGet")]
+        [Function("MaintenanceGet")]
         public async Task<IActionResult> MaintenanceGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "maintenance/{id}")] MaintenanceDto request,
-            string id,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal,
-            CancellationToken token
-        )
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "maintenance/{id}")] HttpRequest request,
+            string id)
         {
-            var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            var documentResponse = await client.ReadDocumentAsync<MaintenanceModel>(uri, options, token);
-            var maintenance = _mapper.Map<MaintenanceDto>(documentResponse.Document);
-            log.LogInformation($"Got maintenance id {id} for user {_b2cHelper.GetOid(principal)}");
+            var userId = _b2cHelper.GetOid(request);
+            var response = await GetContainer().ReadItemAsync<MaintenanceModel>(id, new PartitionKey(userId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            var maintenance = _mapper.Map<MaintenanceDto>(response.Resource);
+            _logger.LogInformation($"Got maintenance id {id} for user {userId}");
             return new OkObjectResult(maintenance);
         }
     }

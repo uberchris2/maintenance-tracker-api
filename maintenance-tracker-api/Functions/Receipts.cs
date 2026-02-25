@@ -1,65 +1,73 @@
 using System;
-using System.IO;
-using System.Linq;
-using System.Security.Claims;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
 using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace maintenance_tracker_api.Functions
 {
     public class Receipts
     {
         private readonly IB2cHelper _b2cHelper;
+        private readonly CosmosClient _cosmosClient;
+        private readonly BlobContainerClient _container;
+        private readonly ILogger<Receipts> _logger;
 
-        public Receipts(IB2cHelper b2cHelper)
+        public Receipts(IB2cHelper b2cHelper, CosmosClient cosmosClient, BlobContainerClient container, ILogger<Receipts> logger)
         {
             _b2cHelper = b2cHelper;
+            _cosmosClient = cosmosClient;
+            _container = container;
+            _logger = logger;
         }
 
-        [FunctionName("ReceiptAuthorizationGet")]
+        [Function("ReceiptAuthorizationGet")]
         public IActionResult ReceiptAuthorizationGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
-            [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request)
         {
-            var blob = container.GetBlockBlobReference($"{_b2cHelper.GetOid(principal)}/{request.Query["name"]}");
-            var policy = new SharedAccessBlobPolicy
+            var userId = _b2cHelper.GetOid(request);
+            var name = request.Query["name"].ToString();
+            var blobClient = _container.GetBlobClient($"{userId}/{name}");
+            var sasBuilder = new BlobSasBuilder(BlobSasPermissions.Read | BlobSasPermissions.Write, DateTimeOffset.UtcNow.AddHours(1))
             {
-                SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
-                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(1),
-                Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write
+                BlobContainerName = _container.Name,
+                BlobName = blobClient.Name,
+                Resource = "b",
+                StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5)
             };
-            var sas = blob.GetSharedAccessSignature(policy);
-            log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for user {_b2cHelper.GetOid(principal)}");
-            var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
-            return new OkObjectResult(authorization);
+            var sasUri = blobClient.GenerateSasUri(sasBuilder);
+            _logger.LogInformation($"Authorized access to receipt \"{name}\" for user {userId}");
+            return new OkObjectResult(new ReceiptAuthorizationDto { Url = sasUri.ToString() });
         }
 
-        [FunctionName("ReceiptsGet")]
-        public IActionResult ReceiptsGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "receipts")] HttpRequest request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+        [Function("ReceiptsGet")]
+        public async Task<IActionResult> ReceiptsGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "receipts")] HttpRequest request)
         {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var receipts = client.CreateDocumentQuery<MaintenanceModel>(uri) //TODO async
-                .Where(x => x.UserId == _b2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Maintenance && x.Receipt != null)
-                .Select(x => x.Receipt)
-                .Distinct()
-                .ToList();
-            log.LogInformation($"Got receipts for user {_b2cHelper.GetOid(principal)}");
-            return new OkObjectResult(receipts);
+            var userId = _b2cHelper.GetOid(request);
+            var query = _cosmosClient.GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance")
+                .GetItemLinqQueryable<MaintenanceModel>(
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(userId.ToString()) })
+                .Where(x => x.UserId == userId && x.Type == VehicleMaintenanceTypes.Maintenance && x.Receipt != null)
+                .ToFeedIterator();
+
+            var receipts = new List<string>();
+            while (query.HasMoreResults)
+            {
+                foreach (var item in await query.ReadNextAsync(request.HttpContext.RequestAborted))
+                    receipts.Add(item.Receipt);
+            }
+
+            _logger.LogInformation($"Got receipts for user {userId}");
+            return new OkObjectResult(receipts.Distinct());
         }
     }
 }

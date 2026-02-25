@@ -1,51 +1,66 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
+using System.Threading.Tasks;
+using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
 using common.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace maintenance_tracker_api_public.Functions
 {
     public class Receipts
     {
-        //I would love to use a SqlQuery in this endpoint, but https://github.com/Azure/azure-webjobs-sdk/issues/1726
-        [FunctionName("ReceiptAuthorizationGet")]
-        public IActionResult ReceiptAuthorizationGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request,
-            [Blob("receipts", FileAccess.ReadWrite, Connection = "UploadStorage")] CloudBlobContainer container,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            CancellationToken token
-        )
+        private readonly CosmosClient _cosmosClient;
+        private readonly BlobContainerClient _container;
+        private readonly ILogger<Receipts> _logger;
+
+        public Receipts(CosmosClient cosmosClient, BlobContainerClient container, ILogger<Receipts> logger)
         {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var vehicleId = Guid.Parse(request.Query["vehicleId"]);
-            var userId = Guid.Parse(request.Query["userId"]);
-            var vehiclesAndMaintenance = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri)
-                .Where(x => x.UserId == userId && (x.id == vehicleId || x.VehicleId == vehicleId)).ToList();
+            _cosmosClient = cosmosClient;
+            _container = container;
+            _logger = logger;
+        }
+
+        [Function("ReceiptAuthorizationGet")]
+        public async Task<IActionResult> ReceiptAuthorizationGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "authorizeReceipt")] HttpRequest request)
+        {
+            var vehicleId = Guid.Parse(request.Query["vehicleId"]!);
+            var userId = Guid.Parse(request.Query["userId"]!);
+            var name = request.Query["name"].ToString();
+
+            var query = _cosmosClient.GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance")
+                .GetItemLinqQueryable<VehicleMaintenanceModel>()
+                .Where(x => x.UserId == userId && (x.id == vehicleId || x.VehicleId == vehicleId))
+                .ToFeedIterator();
+
+            var vehiclesAndMaintenance = new List<VehicleMaintenanceModel>();
+            while (query.HasMoreResults)
+                vehiclesAndMaintenance.AddRange(await query.ReadNextAsync(request.HttpContext.RequestAborted));
+
             if (!vehiclesAndMaintenance.Single(vm => vm.Type == VehicleMaintenanceTypes.Vehicle).Shared
-                || !vehiclesAndMaintenance.Any(vm => vm.Type == VehicleMaintenanceTypes.Maintenance && vm.Receipt == request.Query["name"]))
+                || !vehiclesAndMaintenance.Any(vm => vm.Type == VehicleMaintenanceTypes.Maintenance && vm.Receipt == name))
             {
                 return new BadRequestResult();
             }
-            var blob = container.GetBlockBlobReference($"{request.Query["userId"]}/{request.Query["name"]}");
-            var policy = new SharedAccessBlobPolicy
+
+            var blobClient = _container.GetBlobClient($"{userId}/{name}");
+            var sasBuilder = new BlobSasBuilder(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1))
             {
-                SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
-                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(1),
-                Permissions = SharedAccessBlobPermissions.Read
+                BlobContainerName = _container.Name,
+                BlobName = blobClient.Name,
+                Resource = "b",
+                StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5)
             };
-            var sas = blob.GetSharedAccessSignature(policy);
-            log.LogInformation($"Authorized access to receipt \"{request.Query["name"]}\" for anonymous user at {request.HttpContext.Connection.RemoteIpAddress}");
-            var authorization = new ReceiptAuthorizationDto { Url = $"{blob.Uri}{sas}" };
-            return new OkObjectResult(authorization);
+            var sasUri = blobClient.GenerateSasUri(sasBuilder);
+            _logger.LogInformation($"Authorized access to receipt \"{name}\" for anonymous user at {request.HttpContext.Connection.RemoteIpAddress}");
+            return new OkObjectResult(new ReceiptAuthorizationDto { Url = sasUri.ToString() });
         }
     }
 }

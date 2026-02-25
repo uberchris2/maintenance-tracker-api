@@ -1,18 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
-using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using common.Models;
 using maintenance_tracker_api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
 namespace maintenance_tracker_api.Functions
@@ -21,88 +18,93 @@ namespace maintenance_tracker_api.Functions
     {
         private readonly IB2cHelper _b2cHelper;
         private readonly IMapper _mapper;
+        private readonly CosmosClient _cosmosClient;
+        private readonly ILogger<Vehicles> _logger;
 
-        public Vehicles(IB2cHelper b2cHelper, IMapper mapper)
+        public Vehicles(IB2cHelper b2cHelper, IMapper mapper, CosmosClient cosmosClient, ILogger<Vehicles> logger)
         {
             _b2cHelper = b2cHelper;
             _mapper = mapper;
+            _cosmosClient = cosmosClient;
+            _logger = logger;
         }
 
-        [FunctionName("VehiclesPut")]
-        public void VehiclesPut(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "vehicles")] VehicleDto request,
-            [CosmosDB(
-                databaseName: "MaintenanceDB",
-                collectionName: "VehicleMaintenance",
-                ConnectionStringSetting = "CosmosDBConnection")]out VehicleModel vehicle,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+        private Container GetContainer() =>
+            _cosmosClient.GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance");
+
+        [Function("VehiclesPut")]
+        public async Task<IActionResult> VehiclesPut(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "vehicles")] HttpRequest request)
         {
-            vehicle = _mapper.Map<VehicleModel>(request);
+            var dto = await request.ReadFromJsonAsync<VehicleDto>();
+            var vehicle = _mapper.Map<VehicleModel>(dto);
             if (vehicle.id == Guid.Empty)
-            {
                 vehicle.id = Guid.NewGuid();
-            }
-            vehicle.UserId = _b2cHelper.GetOid(principal);
+            vehicle.UserId = _b2cHelper.GetOid(request);
             vehicle.Type = VehicleMaintenanceTypes.Vehicle;
-            log.LogInformation($"Saving new vehicle id {vehicle.id} for user {_b2cHelper.GetOid(principal)}");
+            await GetContainer().UpsertItemAsync(vehicle, new PartitionKey(vehicle.UserId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            _logger.LogInformation($"Saving vehicle id {vehicle.id} for user {vehicle.UserId}");
+            return new OkResult();
         }
 
-        [FunctionName("VehiclesGet")]
-        public IActionResult VehiclesGet(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles")] HttpRequest request,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+        [Function("VehiclesGet")]
+        public async Task<IActionResult> VehiclesGet(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles")] HttpRequest request)
         {
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            //TODO async this once its implemented https://github.com/Azure/azure-cosmos-dotnet-v2/issues/287
-            var vehicles = client.CreateDocumentQuery<VehicleModel>(uri)
-                .Where(x => x.UserId == _b2cHelper.GetOid(principal) && x.Type == VehicleMaintenanceTypes.Vehicle);
-            var mappedVehicles = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
-            log.LogInformation($"Got all vehicles for user {_b2cHelper.GetOid(principal)}");
-            return new OkObjectResult(mappedVehicles);
+            var userId = _b2cHelper.GetOid(request);
+            var query = GetContainer()
+                .GetItemLinqQueryable<VehicleModel>(
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(userId.ToString()) })
+                .Where(x => x.UserId == userId && x.Type == VehicleMaintenanceTypes.Vehicle)
+                .ToFeedIterator();
+
+            var vehicles = new List<VehicleModel>();
+            while (query.HasMoreResults)
+                vehicles.AddRange(await query.ReadNextAsync(request.HttpContext.RequestAborted));
+
+            _logger.LogInformation($"Got all vehicles for user {userId}");
+            return new OkObjectResult(_mapper.Map<IEnumerable<VehicleDto>>(vehicles));
         }
 
-        [FunctionName("VehicleGet")]
+        [Function("VehicleGet")]
         public async Task<IActionResult> VehicleGet(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vehicles/{id}")] HttpRequest request,
-            string id,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal,
-            CancellationToken token
-        )
+            string id)
         {
-            var uri = UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", id);
-            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            var documentResponse = await client.ReadDocumentAsync<VehicleModel>(uri, options, token);
-            var vehicle = _mapper.Map<VehicleDto>(documentResponse.Document);
-            log.LogInformation($"Got vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
+            var userId = _b2cHelper.GetOid(request);
+            var response = await GetContainer().ReadItemAsync<VehicleModel>(id, new PartitionKey(userId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            var vehicle = _mapper.Map<VehicleDto>(response.Resource);
+            _logger.LogInformation($"Got vehicle id {id} for user {userId}");
             return new OkObjectResult(vehicle);
         }
 
-        [FunctionName("VehicleDelete")]
-        public async Task VehicleMaintenanceDelete(
+        [Function("VehicleDelete")]
+        public async Task<IActionResult> VehicleDelete(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "vehicle/{id}")] HttpRequest request,
-            string id,
-            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
-            ILogger log,
-            ClaimsPrincipal principal,
-            CancellationToken token
-        )
+            string id)
         {
-            var options = new RequestOptions { PartitionKey = new PartitionKey(_b2cHelper.GetOid(principal).ToString()) };
-            var uri = UriFactory.CreateDocumentCollectionUri("MaintenanceDB", "VehicleMaintenance");
-            var tasks = client.CreateDocumentQuery<VehicleMaintenanceModel>(uri)
-                .Where(m => (m.VehicleId == Guid.Parse(id) ||  m.id == Guid.Parse(id)) && m.UserId == _b2cHelper.GetOid(principal))
-                .ToList()
-                .Select(m => UriFactory.CreateDocumentUri("MaintenanceDB", "VehicleMaintenance", m.id.ToString()))
-                .Select(u => client.DeleteDocumentAsync(u, options, token));
-            await Task.WhenAll(tasks);
-            log.LogInformation($"Deleted vehicle id {id} for user {_b2cHelper.GetOid(principal)}");
+            var userId = _b2cHelper.GetOid(request);
+            var parsedId = Guid.Parse(id);
+            var container = GetContainer();
+
+            var query = container
+                .GetItemLinqQueryable<VehicleMaintenanceModel>(
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(userId.ToString()) })
+                .Where(m => (m.VehicleId == parsedId || m.id == parsedId) && m.UserId == userId)
+                .ToFeedIterator();
+
+            var records = new List<VehicleMaintenanceModel>();
+            while (query.HasMoreResults)
+                records.AddRange(await query.ReadNextAsync(request.HttpContext.RequestAborted));
+
+            var deleteTasks = records.Select(m =>
+                container.DeleteItemAsync<VehicleMaintenanceModel>(m.id.ToString(), new PartitionKey(userId.ToString()),
+                    cancellationToken: request.HttpContext.RequestAborted));
+            await Task.WhenAll(deleteTasks);
+            _logger.LogInformation($"Deleted vehicle id {id} for user {userId}");
+            return new OkResult();
         }
     }
 }

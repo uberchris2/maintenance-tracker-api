@@ -1,29 +1,39 @@
 using System;
-using System.Security.Claims;
+using System.Threading.Tasks;
 using common.Models;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using SendGrid;
 using SendGrid.Helpers.Mail;
 
 namespace maintenance_tracker_api_public.Functions
 {
     public class Feedback
     {
-        [FunctionName("FeedbackPost")]
-        public void FeedbackPost(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "feedback")] FeedbackDto request,
-            [SendGrid] out SendGridMessage message,
-            ILogger log,
-            ClaimsPrincipal principal
-        )
+        private readonly ISendGridClient _sendGridClient;
+        private readonly ILogger<Feedback> _logger;
+
+        public Feedback(ISendGridClient sendGridClient, ILogger<Feedback> logger)
         {
-            message = new SendGridMessage();
+            _sendGridClient = sendGridClient;
+            _logger = logger;
+        }
+
+        [Function("FeedbackPost")]
+        public async Task<IActionResult> FeedbackPost(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "feedback")] HttpRequest request)
+        {
+            var dto = await request.ReadFromJsonAsync<FeedbackDto>();
+            var message = new SendGridMessage();
             message.AddTo(Environment.GetEnvironmentVariable("FeedbackRecipient"));
-            message.AddContent("text/html", request.Message);
-            message.SetFrom(request.Email);
+            message.AddContent("text/html", dto!.Message);
+            message.SetFrom(dto.Email);
             message.SetSubject("Feedback for MaintenanceTracker");
-            log.LogInformation($"Sending feedback message from anonymous user");
+            await _sendGridClient.SendEmailAsync(message, request.HttpContext.RequestAborted);
+            _logger.LogInformation("Sending feedback message from anonymous user");
+            return new OkResult();
         }
     }
 }
