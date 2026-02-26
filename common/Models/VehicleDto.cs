@@ -11,5 +11,6 @@ namespace common.Models
         public string Name { get; set; }
         public int Mileage { get; set; }
         public bool Shared { get; set; }
+        public string? Vin { get; set; }
     }
 }
