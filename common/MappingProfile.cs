@@ -11,6 +11,7 @@ namespace common
             CreateMap<MaintenanceDto, MaintenanceModel>();
             CreateMap<VehicleModel, VehicleDto>();
             CreateMap<MaintenanceModel, MaintenanceDto>();
+            CreateMap<VehicleMaintenanceModel, MaintenanceDto>();
             CreateMap<VehicleMaintenanceModel, VehicleMaintenanceDto>();
         }
     }
