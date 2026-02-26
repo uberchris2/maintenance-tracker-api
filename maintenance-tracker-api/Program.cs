@@ -15,7 +15,6 @@ var host = new HostBuilder()
 
         services.AddAutoMapper(typeof(MappingProfile));
         services.AddTransient<IB2cHelper, B2cHelper>();
-        services.AddHttpClient();
 
         services.AddSingleton(_ =>
             new CosmosClient(context.Configuration["CosmosDBConnection"]));
