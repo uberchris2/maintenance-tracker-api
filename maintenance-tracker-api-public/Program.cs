@@ -1,5 +1,4 @@
 using Azure.Storage.Blobs;
-using common;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +12,11 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
-        services.AddAutoMapper(typeof(MappingProfile));
-
         services.AddSingleton(_ =>
             new CosmosClient(context.Configuration["CosmosDBConnection"]));
+
+        services.AddSingleton(sp =>
+            sp.GetRequiredService<CosmosClient>().GetDatabase("MaintenanceDB").GetContainer("VehicleMaintenance"));
 
         services.AddSingleton(_ =>
             new BlobContainerClient(context.Configuration["UploadStorage"], "receipts"));

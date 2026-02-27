@@ -1,8 +1,7 @@
-namespace common.Models
+namespace common.Models;
+
+public static class VehicleMaintenanceTypes
 {
-    public class VehicleMaintenanceTypes
-    {
-        public static string Vehicle = "vehicle";
-        public static string Maintenance = "maintenance";
-    }
+    public const string Vehicle = "vehicle";
+    public const string Maintenance = "maintenance";
 }

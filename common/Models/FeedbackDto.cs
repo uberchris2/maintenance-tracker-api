@@ -1,8 +1,7 @@
-namespace common.Models
+namespace common.Models;
+
+public record FeedbackDto
 {
-    public class FeedbackDto
-    {
-        public string Message { get; set; }
-        public string Email { get; set; }
-    }
+    public string Message { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 }

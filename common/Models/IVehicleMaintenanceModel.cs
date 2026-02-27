@@ -1,11 +1,8 @@
-using System;
+namespace common.Models;
 
-namespace common.Models
+public interface IVehicleMaintenanceModel
 {
-    public interface IVehicleMaintenanceModel
-    {
-        Guid id { get; set; }
-        string Type { get; set; }
-        Guid UserId { get; set; }
-    }
+    Guid id { get; set; }
+    string Type { get; set; }
+    Guid UserId { get; set; }
 }
