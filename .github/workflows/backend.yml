@@ -19,7 +19,7 @@ jobs:
 
       # Private API
       - name: Publish private API
-        run: dotnet publish --configuration Release --output '${{ github.workspace }}/artifacts/maintenance-tracker-api'
+        run: dotnet publish --configuration Release -p:UseCurrentRuntimeIdentifier=false --output '${{ github.workspace }}/artifacts/maintenance-tracker-api'
         working-directory: maintenance-tracker-api
 
       - name: Upload private API artifact
@@ -31,7 +31,7 @@ jobs:
 
       # Public API
       - name: Publish public API
-        run: dotnet publish --configuration Release --output '${{ github.workspace }}/artifacts/maintenance-tracker-api-public'
+        run: dotnet publish --configuration Release -p:UseCurrentRuntimeIdentifier=false --output '${{ github.workspace }}/artifacts/maintenance-tracker-api-public'
         working-directory: maintenance-tracker-api-public
 
       - name: Upload public API artifact
