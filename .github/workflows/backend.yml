@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use .NET 8 SDK
+      - name: Use .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.x'
+          dotnet-version: '10.x'
 
       # Private API
       - name: Restore private API
