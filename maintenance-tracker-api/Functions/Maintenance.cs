@@ -22,9 +22,32 @@ public class Maintenance(IB2cHelper b2cHelper, Container container, ILogger<Main
             maintenance.id = Guid.NewGuid();
         maintenance.UserId = b2cHelper.GetOid(request);
         maintenance.Type = VehicleMaintenanceTypes.Maintenance;
+        logger.LogInformation("Upserting maintenance {MaintenanceId} for user {UserId}", maintenance.id, maintenance.UserId);
         await container.UpsertItemAsync(maintenance, new PartitionKey(maintenance.UserId.ToString()),
             cancellationToken: request.HttpContext.RequestAborted);
-        logger.LogInformation("Upserting maintenance {MaintenanceId} for user {UserId}", maintenance.id, maintenance.UserId);
+
+        try
+        {
+            var vehicleResponse = await container.ReadItemAsync<VehicleModel>(
+                maintenance.VehicleId.ToString(),
+                new PartitionKey(maintenance.UserId.ToString()),
+                cancellationToken: request.HttpContext.RequestAborted);
+            var vehicle = vehicleResponse.Resource;
+            if (maintenance.Mileage > vehicle.Mileage)
+            {
+                vehicle.Mileage = maintenance.Mileage;
+                await container.UpsertItemAsync(vehicle, new PartitionKey(maintenance.UserId.ToString()),
+                    cancellationToken: request.HttpContext.RequestAborted);
+                logger.LogInformation("Updated vehicle {VehicleId} mileage to {Mileage} for user {UserId}",
+                    vehicle.id, vehicle.Mileage, maintenance.UserId);
+            }
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            logger.LogWarning("Vehicle {VehicleId} not found when updating mileage for user {UserId}",
+                maintenance.VehicleId, maintenance.UserId);
+        }
+
         return new OkResult();
     }
 
